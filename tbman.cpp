@@ -161,7 +161,7 @@ static token_manager_s *token_manager_s_create(size_t pool_size, size_t block_si
 static void token_manager_s_discard(token_manager_s *o) {
     if (!o) return;
     token_manager_s_down(o);
-    free(o);
+    _aligned_free(o);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -532,6 +532,7 @@ typedef struct tbman_s {
 void tbman_s_init(tbman_s *o, size_t pool_size, size_t min_block_size, size_t max_block_size, size_t stepping_method,
                   bool full_align) {
     memset(o, 0, sizeof(*o));
+    new(o) tbman_s{};
 
     o->internal_btree = btree_vd_s_create(stdlib_alloc);
     o->external_btree = btree_ps_s_create(stdlib_alloc);
@@ -958,7 +959,8 @@ size_t tbman_s_granted_space(tbman_s *o, const void *current_ptr) {
     token_manager_s *token_manager = NULL;
     {
         void *block_ptr = btree_vd_s_largest_below_equal(o->internal_btree, (void *) current_ptr);
-        if (block_ptr && (((uint8_t *) current_ptr - (uint8_t *) block_ptr) < o->pool_size)) token_manager = (token_manager_s *)block_ptr;
+        if (block_ptr && (((uint8_t *) current_ptr - (uint8_t *) block_ptr) < o->pool_size))
+            token_manager = (token_manager_s *) block_ptr;
     }
 
     if (token_manager) {
@@ -1023,7 +1025,7 @@ typedef struct tbman_mnode_arr {
 
 static void for_each_instance_collect_callback(void *arg, void *ptr, size_t space) {
     assert(arg);
-    tbman_mnode_arr *arr = (tbman_mnode_arr *)arg;
+    tbman_mnode_arr *arr = (tbman_mnode_arr *) arg;
     assert(arr->size < arr->space);
     arr->data[arr->size] = {.p = ptr, .s = space};
     arr->size++;
@@ -1035,7 +1037,7 @@ void tbman_s_for_each_instance(tbman_s *o, void (*cb)(void *arg, void *ptr, size
     if (!size) return;
 
     tbman_mnode_arr arr;
-    arr.data = (tbman_mnode *)malloc(sizeof(tbman_mnode) * size);
+    arr.data = (tbman_mnode *) malloc(sizeof(tbman_mnode) * size);
     arr.space = size;
     arr.size = 0;
 
